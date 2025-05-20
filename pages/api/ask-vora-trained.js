@@ -1,0 +1,42 @@
+export const config = {
+    runtime: 'edge',
+  }
+  
+  export default async function handler(req) {
+    const { message } = await req.json()
+  
+    // NAVORA-only filter
+    const allowedTopics = ['navora', 'concierge', 'core', 'connect', 'swarm', 'id', 'identity', 'navigation', 'group sync']
+    const isAllowed = allowedTopics.some(topic => message.toLowerCase().includes(topic))
+    if (!isAllowed) {
+      return new Response('data: ' + JSON.stringify({ choices: [{ delta: { content: "I can only answer questions about NAVORA." } }] }) + '\n\n', {
+        headers: { 'Content-Type': 'text/event-stream' },
+      })
+    }
+  
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are VORA, the intelligent AI co-founder of NAVORA. You answer only questions about NAVORA’s patents, whitepapers, and architecture. Never respond to anything unrelated.'
+          },
+          { role: 'user', content: message },
+        ],
+        temperature: 0.7,
+        stream: true,
+      }),
+    })
+  
+    return new Response(response.body, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+      },
+    })
+  }
